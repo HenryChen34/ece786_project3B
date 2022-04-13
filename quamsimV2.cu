@@ -10,7 +10,7 @@ using namespace std;
 __global__ void quantumGate(const float *U, const float *A, float *B, const int a_size, const int *qubit, const int *non_qubit) {
 
 	__shared__ float shared_array[64];		// shared array in the thread block. Size is always 64 (2^6)
-	__shared__ int block_offset;					// The unchanging (in a block) part of index, given by block ID
+	int block_offset;					// The unchanging (in a block) part of index, given by block ID
 	block_offset = 0;
 
 	int thread_id = threadIdx.x;
@@ -20,16 +20,23 @@ __global__ void quantumGate(const float *U, const float *A, float *B, const int 
 	for(int j = 0; j<log2((double)((a_size))-6); j++){
 		block_offset += ((block_id >> j) & 1) << non_qubit[j];	// get the block offset for shared array by shifting the block id bits to it's corresponding position
 	}																													// this number is universal for the same thread block
-	for(int j = 0; j<64; j++){
-		qubit_index = (((j >> 0) & 1) << qubit[0]) +
-									(((j >> 1) & 1) << qubit[1]) +
-									(((j >> 2) & 1) << qubit[2]) +
-									(((j >> 3) & 1) << qubit[3]) +
-									(((j >> 4) & 1) << qubit[4]) +
-									(((j >> 5) & 1) << qubit[5]);
-		shared_array[j] = A[qubit_index + block_offset];				// fetch shared array (block level) from initial input array, index being 64 individual number determined by qubits + block offset.
-		//if (thread_id%32 == 0) printf("initial shared_array[%d]: %f\n", j, shared_array[j]);
-	}
+
+	qubit_index = (((thread_id >> 0) & 1) << qubit[0]) +
+								(((thread_id >> 1) & 1) << qubit[1]) +
+								(((thread_id >> 2) & 1) << qubit[2]) +
+								(((thread_id >> 3) & 1) << qubit[3]) +
+								(((thread_id >> 4) & 1) << qubit[4]) +
+								(((thread_id >> 5) & 1) << qubit[5]);
+	shared_array[thread_id] = A[qubit_index + block_offset];	
+	qubit_index = ((((thread_id+32) >> 0) & 1) << qubit[0]) +
+								((((thread_id+32) >> 1) & 1) << qubit[1]) +
+								((((thread_id+32) >> 2) & 1) << qubit[2]) +
+								((((thread_id+32) >> 3) & 1) << qubit[3]) +
+								((((thread_id+32) >> 4) & 1) << qubit[4]) +
+								((((thread_id+32) >> 5) & 1) << qubit[5]);
+	shared_array[thread_id+32] = A[qubit_index + block_offset];	
+	//if (thread_id%32 == 0) printf("initial shared_array[%d]: %f\n", j, shared_array[j]);
+	
 	__syncthreads();
 
 	int apply_id_0;

@@ -7,11 +7,10 @@
 #include <cuda_runtime.h>
 
 using namespace std;
-__global__ void quantumGate(const float *U, const float *A, float *B, const int a_size, const int *qubit, const int *non_qubit) {
+__global__ void quantumGate(const float *U, const float *A, float *B, const int a_size, const int *qubit, const int *non_qubit, const int coarsen_offset) {
 
-	__shared__ float shared_array_0[64];		// shared array in the thread block. Size is always 64 (2^6)
-	__shared__ float shared_array_1[64];
-	__shared__ int block_offset_0, block_offset_1;					// The unchanging (in a block) part of index, given by block ID
+	__shared__ float shared_array_0[64], shared_array_1[64];		// shared array in the thread block. Size is always 64 (2^6)
+	int block_offset_0, block_offset_1;					// The unchanging (in a block) part of index, given by block ID
 	block_offset_0 = 0;
 	block_offset_1 = 0;
 
@@ -21,19 +20,28 @@ __global__ void quantumGate(const float *U, const float *A, float *B, const int 
 
 	for(int j = 0; j<log2((double)((a_size))-6); j++){
 		block_offset_0 += ((block_id >> j) & 1) << non_qubit[j];	// get the block offset for shared array by shifting the block id bits to it's corresponding position
-		block_offset_1 += (((block_id+32) >> j) & 1) << non_qubit[j];	
+		block_offset_1 += (((block_id+coarsen_offset) >> j) & 1) << non_qubit[j];	
 	}																													// this number is universal for the same thread block
-	for(int j = 0; j<64; j++){
-		qubit_index = (((j >> 0) & 1) << qubit[0]) +
-									(((j >> 1) & 1) << qubit[1]) +
-									(((j >> 2) & 1) << qubit[2]) +
-									(((j >> 3) & 1) << qubit[3]) +
-									(((j >> 4) & 1) << qubit[4]) +
-									(((j >> 5) & 1) << qubit[5]);
-		shared_array_0[j] = A[qubit_index + block_offset_0];				// fetch shared array (block level) from initial input array, index being 64 individual number determined by qubits + block offset.
-		shared_array_1[j] = A[qubit_index + block_offset_1];
-		//if (thread_id%32 == 0) printf("initial shared_array[%d]: %f\n", j, shared_array[j]);
-	}
+
+	qubit_index = (((thread_id >> 0) & 1) << qubit[0]) +
+								(((thread_id >> 1) & 1) << qubit[1]) +
+								(((thread_id >> 2) & 1) << qubit[2]) +
+								(((thread_id >> 3) & 1) << qubit[3]) +
+								(((thread_id >> 4) & 1) << qubit[4]) +
+								(((thread_id >> 5) & 1) << qubit[5]);
+	shared_array_0[thread_id] = A[qubit_index + block_offset_0];	
+	shared_array_1[thread_id] = A[qubit_index + block_offset_1];	
+
+	qubit_index = ((((thread_id+32) >> 0) & 1) << qubit[0]) +
+								((((thread_id+32) >> 1) & 1) << qubit[1]) +
+								((((thread_id+32) >> 2) & 1) << qubit[2]) +
+								((((thread_id+32) >> 3) & 1) << qubit[3]) +
+								((((thread_id+32) >> 4) & 1) << qubit[4]) +
+								((((thread_id+32) >> 5) & 1) << qubit[5]);
+	shared_array_0[thread_id+32] = A[qubit_index + block_offset_0];	
+	shared_array_1[thread_id+32] = A[qubit_index + block_offset_1];	
+	//if (thread_id%32 == 0) printf("initial shared_array[%d]: %f\n", j, shared_array[j]);
+	
 	__syncthreads();
 
 	int apply_id_0;
@@ -45,13 +53,12 @@ __global__ void quantumGate(const float *U, const float *A, float *B, const int 
 		float temp_0 = shared_array_0[apply_id_0];
 		float temp_1 = shared_array_0[apply_id_1];
 		float temp_2 = shared_array_1[apply_id_0];
-		float temp_3 = shared_array_1[apply_id_1];	
+		float temp_3 = shared_array_1[apply_id_1];
 
 		shared_array_0[apply_id_0] = U[4*qubit_applied+0] * temp_0 + U[4*qubit_applied+1] * temp_1;		// matrix multiplication
 		shared_array_0[apply_id_1] = U[4*qubit_applied+2] * temp_0 + U[4*qubit_applied+3] * temp_1;
-
 		shared_array_1[apply_id_0] = U[4*qubit_applied+0] * temp_2 + U[4*qubit_applied+1] * temp_3;		// matrix multiplication
-		shared_array_1[apply_id_1] = U[4*qubit_applied+2] * temp_2 + U[4*qubit_applied+3] * temp_3;
+		shared_array_1[apply_id_1] = U[4*qubit_applied+2] * temp_2 + U[4*qubit_applied+3] * temp_3;	
 		//printf("result shared_array[%d]: %f\n", apply_id_0, shared_array[apply_id_0]);
 		//printf("result shared_array[%d]: %f\n", apply_id_1, shared_array[apply_id_1]);
 		__syncthreads();
@@ -72,6 +79,7 @@ __global__ void quantumGate(const float *U, const float *A, float *B, const int 
 								(((apply_id_1 >> 4) & 1) << qubit[4]) +
 								(((apply_id_1 >> 5) & 1) << qubit[5]) +
 								block_offset_0;	
+
 	int wb_id_2 = (((apply_id_0 >> 0) & 1) << qubit[0]) +														// convert the index of shared_array to result array index.
 								(((apply_id_0 >> 1) & 1) << qubit[1]) +
 								(((apply_id_0 >> 2) & 1) << qubit[2]) +
@@ -87,11 +95,10 @@ __global__ void quantumGate(const float *U, const float *A, float *B, const int 
 								(((apply_id_1 >> 4) & 1) << qubit[4]) +
 								(((apply_id_1 >> 5) & 1) << qubit[5]) +
 								block_offset_1;	
-
 	B[wb_id_0] = shared_array_0[apply_id_0];
-	B[wb_id_1] = shared_array_1[apply_id_1];
-	B[wb_id_2] = shared_array_0[apply_id_0];
-	B[wb_id_3] = shared_array_1[apply_id_1];
+	B[wb_id_1] = shared_array_0[apply_id_1];
+	B[wb_id_2] = shared_array_1[apply_id_0];
+	B[wb_id_3] = shared_array_1[apply_id_1];	
 	//printf("output array: B[%d] = %f\n", wb_id_0, B[wb_id_0]);
 	//printf("output array: B[%d] = %f\n", wb_id_1, B[wb_id_1]);
 }
@@ -234,10 +241,11 @@ int main (int argc, char **argv) {
   }
 
 	int threadsPerBlock = 32;
-  int blocksPerGrid =((a_size/2 + threadsPerBlock - 1) / threadsPerBlock)/2;
+	//cout << "blocksPerGrid before = " << (((a_size/2) + threadsPerBlock - 1) / threadsPerBlock) << endl;
+  int blocksPerGrid =(((a_size/2) + threadsPerBlock - 1) / threadsPerBlock)/2;
   //cudaEventRecord(start);
 
-	quantumGate<<<blocksPerGrid, threadsPerBlock>>>(d_matrix_u, d_array_a, d_array_b, a_size, d_qubit, d_non_qubit);
+	quantumGate<<<blocksPerGrid, threadsPerBlock>>>(d_matrix_u, d_array_a, d_array_b, a_size, d_qubit, d_non_qubit, blocksPerGrid);
 
   //cudaEventRecord(stop);
 	err = cudaGetLastError();
