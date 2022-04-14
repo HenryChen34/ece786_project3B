@@ -18,7 +18,8 @@ __global__ void quantumGate(const float *U, const float *A, float *B, const int 
 	int qubit_index;											// The changing part of 64 index, given by qubits.
 
 	for(int j = 0; j<log2((double)((a_size))-6); j++){
-		block_offset += ((block_id >> j) & 1) << non_qubit[j];	// get the block offset for shared array by shifting the block id bits to it's corresponding position
+		block_offset += ((block_id >> j) & 1) << non_qubit[j];	// get the block offset for shared array by shifting
+																														// the block id bits to it's corresponding position
 	}																													// this number is universal for the same thread block
 
 	qubit_index = (((thread_id >> 0) & 1) << qubit[0]) +
