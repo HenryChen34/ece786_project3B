@@ -47,8 +47,8 @@ __global__ void quantumGate(const float *U, const float *A, float *B, const int 
 	int apply_id_0;
 	int apply_id_1;
 	for (int qubit_applied = 0; qubit_applied<6; qubit_applied++){
-		apply_id_0 = thread_id*2 - thread_id%(int)(pow(2,qubit_applied));						// algriothm for matching shared_array index to be used and thread id.
-		apply_id_1 = thread_id*2 - thread_id%(int)(pow(2,qubit_applied)) + (int)(pow(2,qubit_applied)); 
+		apply_id_0 = thread_id*2 - thread_id%(1<<qubit_applied);						// algriothm for matching shared_array index to be used and thread id.
+		apply_id_1 = thread_id*2 - thread_id%(1<<qubit_applied) + (1<<qubit_applied); 
 
 		float temp_0 = shared_array_0[apply_id_0];
 		float temp_1 = shared_array_0[apply_id_1];
