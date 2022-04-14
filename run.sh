@@ -1,0 +1,12 @@
+
+./quamsimV2 in/input_for_qc7_q0_q2_q3_q4_q5_q6.txt > out/output_for_qc7_q0_q2_q3_q4_q5_q6.txt
+diff out/output_for_qc7_q0_q2_q3_q4_q5_q6.txt golden_out/output_for_qc7_q0_q2_q3_q4_q5_q6.txt
+
+./quamsimV2 in/input_for_qc10_q0_q1_q3_q5_q7_q9.txt > out/output_for_qc10_q0_q1_q3_q5_q7_q9.txt
+diff out/output_for_qc10_q0_q1_q3_q5_q7_q9.txt golden_out/output_for_qc10_q0_q1_q3_q5_q7_q9.txt
+
+./quamsimV2 in/input_for_qc12_q6_q7_q8_q9_q10_q11.txt > out/output_for_qc12_q6_q7_q8_q9_q10_q11.txt
+diff out/output_for_qc12_q6_q7_q8_q9_q10_q11.txt golden_out/output_for_qc12_q6_q7_q8_q9_q10_q11.txt
+
+./quamsimV2 in/input_for_qc16_q0_q2_q4_q6_q8_q10.txt > out/output_for_qc16_q0_q2_q4_q6_q8_q10.txt
+diff out/output_for_qc16_q0_q2_q4_q6_q8_q10.txt golden_out/output_for_qc16_q0_q2_q4_q6_q8_q10.txt
